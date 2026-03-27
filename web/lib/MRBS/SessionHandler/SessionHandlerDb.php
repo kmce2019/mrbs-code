@@ -191,6 +191,14 @@ class SessionHandlerDb implements SessionHandlerInterface, SessionUpdateTimestam
         // of these should normally happen.  If the cipher text has been truncated, because it was too
         // long for the database column, then we should have seen an SQL error when the session data
         // was written.
+        //
+        // Sometimes the integrity check fails because the wrong key is being used.  This can happen on
+        // some servers where access to $_COOKIE has been restricted somehow (though not because 'C' has
+        // been removed from variables_order in php.ini because then the session cookie doesn't work either).
+        // If $_COOKIE is not working, then MRBS will generate a new key, which will be different from the
+        // one used to encrypt the session data.  If this is happening then set
+        // $auth["session_php"]["store_key_in_cookie"] = false;
+        // See https://github.com/meeting-room-booking-system/mrbs-code/issues/3983
         trigger_error(get_class($e) . ': ' . $message, E_USER_WARNING);
         $result = '';
       }
