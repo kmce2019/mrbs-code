@@ -1055,7 +1055,6 @@ function get_fieldset_other_settings() : ElementFieldset
   // TODO: X-MRBS-USERNAME parameter is present?  And should the user details be updated if the display name
   // TODO: and email address for an existing username have changed?  Or maybe just issue a list of differences?
 
-  global $booking_types;
   global $import_default_type, $import_past, $skip;
 
   $fieldset = new ElementFieldset();
