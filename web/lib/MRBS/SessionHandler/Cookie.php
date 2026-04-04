@@ -53,6 +53,14 @@ class Cookie
   }
 
 
+  /**
+   * Check the sizes of the cookies that have been set and trigger a warning if they are too large.
+   *
+   * Browsers will reject cookies that are too large, although `setcookie()` will still set them and return TRUE.
+   * What's considered too large depends on the browser. Some browsers just count the length of the name and value
+   * of the cookie; others also count the length of the options (expires, path, domain, secure, httponly, samesite).
+   * To be on the safe side, the options are included in the calculation.
+   */
   private static function checkCookieSizes() : void
   {
     $max_size = 4096;
@@ -60,11 +68,11 @@ class Cookie
 
     foreach ($headers as $header)
     {
-      if (preg_match('/^Set-Cookie:\s*(.*$)/', $header, $matches))
+      if (preg_match('/^Set-Cookie:\s*([^=]*)=(.*$)/', $header, $matches))
       {
-        if ((string)(new Utf8String($matches[1]))->byteCount() > $max_size)
+        if ((string)(new Utf8String($matches[1] . '=' . $matches[2]))->byteCount() > $max_size)
         {
-          trigger_error("Cookie exceeds $max_size bytes", E_USER_WARNING);
+          trigger_error("Cookie '" . $matches[1] . "' exceeds $max_size bytes", E_USER_WARNING);
         }
       }
     }
