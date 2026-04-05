@@ -134,13 +134,13 @@ function get_field_name(string $value, bool $disabled=false) : Field
 }
 
 
-function get_field_description(string $value, array $is_mandatory_field, bool $disabled=false) : Field
+function get_field_description(string $value, int $area_id, bool $disabled=false) : Field
 {
   $params = array('label'    => get_vocab('fulldescription'),
                   'name'     => 'description',
                   'field'    => 'entry.description',
                   'value'    => $value,
-                  'required' => !empty($is_mandatory_field['entry.description']),
+                  'required' => is_mandatory_field('entry.description', $area_id),
                   'disabled' => $disabled);
 
   return get_field_entry_input($params);
@@ -490,7 +490,7 @@ function get_field_rooms($value, bool $disabled=false) : FieldSelect
 }
 
 
-function get_field_type(string $value, array $is_mandatory_field, bool $disabled=false) : ?FieldSelect
+function get_field_type(string $value, int $area_id, bool $disabled=false) : ?FieldSelect
 {
   // Get the options
   $options = get_type_options(is_book_admin());
@@ -502,8 +502,9 @@ function get_field_type(string $value, array $is_mandatory_field, bool $disabled
     return null;
   }
 
-  // If it's a mandatory field add a blank option to force a selection
-  if (!empty($is_mandatory_field['entry.type']))
+  $required = is_mandatory_field('entry.type', $area_id);
+  // If it's a mandatory field, add a blank option to force a selection
+  if ($required)
   {
     $options = array('' => get_type_vocab('')) + $options;
   }
@@ -513,7 +514,7 @@ function get_field_type(string $value, array $is_mandatory_field, bool $disabled
   $field->setLabel(get_vocab('type'))
         ->setControlAttributes(array('name'     => 'type',
                                      'disabled' => $disabled,
-                                     'required' => !empty($is_mandatory_field['entry.type'])))
+                                     'required' => $required))
         ->addSelectOptions($options, $value, true);
 
   return $field;
@@ -569,7 +570,7 @@ function get_field_privacy_status(bool $value, bool $disabled=false) : ?FieldInp
 }
 
 
-function get_field_custom(string $key, array $is_mandatory_field, bool $disabled=false)
+function get_field_custom(string $key, int $area_id, bool $disabled=false)
 {
   global $custom_fields, $custom_fields_map;
 
@@ -583,6 +584,7 @@ function get_field_custom(string $key, array $is_mandatory_field, bool $disabled
   }
 
   $custom_field = $custom_fields_map[$key];
+  $required = is_mandatory_field('entry.' . $key, $area_id);
 
   // Output a checkbox if it's a boolean or integer <= 2 bytes (which we will
   // assume are intended to be booleans)
@@ -609,7 +611,7 @@ function get_field_custom(string $key, array $is_mandatory_field, bool $disabled
                     'name'     => VAR_PREFIX . $key,
                     'field'    => "entry.$key",
                     'value'    => (isset($custom_fields[$key])) ? $custom_fields[$key] : NULL,
-                    'required' => !empty($is_mandatory_field["entry.$key"]),
+                    'required' => $required,
                     'disabled' => $disabled);
     return get_field_entry_input($params);
   }
@@ -620,7 +622,7 @@ function get_field_custom(string $key, array $is_mandatory_field, bool $disabled
   $field->setLabel(get_loc_field_name(_tbl('entry'), $key))
         ->setControlAttributes(array('name'     => VAR_PREFIX . $key,
                                      'disabled' => $disabled,
-                                     'required' => !empty($is_mandatory_field["entry.$key"])));
+                                     'required' => $required));
 
   if ($custom_field['nature'] == 'decimal')
   {
@@ -1312,6 +1314,7 @@ if (isset($id))
     }
   }
 
+  $area_id = mrbsGetRoomArea($room_id);
 
   if(($entry_type == ENTRY_RPT_ORIGINAL) || ($entry_type == ENTRY_RPT_CHANGED))
   {
@@ -1391,8 +1394,9 @@ else
   }
   $create_by     = $mrbs_username;
   $description   = $default_description;
-  $type          = (empty($is_mandatory_field['entry.type'])) ? $default_type : '';
   $room_id       = $room;
+  $area_id = mrbsGetRoomArea($room_id);
+  $type          = (is_mandatory_field('entry.type', $area_id)) ? '' : $default_type;
   $private       = $private_default;
   $tentative     = !$confirmed_default;
   $allow_registration           = (bool) $allow_registration_default;
@@ -1526,9 +1530,6 @@ if (isset($rep_end_date))
 
 $start_hour  = date('H', $start_time);
 $start_min   = date('i', $start_time);
-
-// Determine the area id of the room in question first
-$area_id = mrbsGetRoomArea($room_id);
 
 $enable_periods ? toPeriodString($start_min, $duration, $dur_units) : toTimeString($duration, $dur_units);
 
@@ -1736,26 +1737,6 @@ if(isset($id) && !$copy)
 $fieldset = new ElementFieldset();
 $fieldset->addLegend(get_vocab($token));
 
-// Process the $is_mandatory_field configuration to work out which fields are mandatory for this area.
-// $is_mandatory_field can be a boolean or an array of area ids, so we need to process it to get a simple boolean for each field.
-$is_mandatory_field_processed = array();
-foreach ($is_mandatory_field as $key => $value)
-{
-  // Boolean values apply to all areas
-  if (is_bool($value))
-  {
-    $is_mandatory_field_processed[$key] = $value;
-  // Arrays of area_ids (ints) define the areas for which the field is mandatory
-  } elseif (in_array($area_id, $value))
-  {
-    $is_mandatory_field_processed[$key] = true;
-  } else
-  {
-    $is_mandatory_field_processed[$key] = false;
-
-  }
-}
-
 foreach ($edit_entry_field_order as $key)
 {
   switch ($key)
@@ -1779,7 +1760,7 @@ foreach ($edit_entry_field_order as $key)
       break;
 
     case 'description':
-      $fieldset->addElement(get_field_description($description, $is_mandatory_field_processed));
+      $fieldset->addElement(get_field_description($description, $area_id));
       break;
 
     case 'start_time':
@@ -1796,7 +1777,7 @@ foreach ($edit_entry_field_order as $key)
       break;
 
     case 'type':
-      $fieldset->addElement(get_field_type($type, $is_mandatory_field_processed));
+      $fieldset->addElement(get_field_type($type, $area_id));
       break;
 
     case 'confirmation_status':
@@ -1808,7 +1789,7 @@ foreach ($edit_entry_field_order as $key)
       break;
 
     default:
-      $fieldset->addElement(get_field_custom($key, $is_mandatory_field_processed));
+      $fieldset->addElement(get_field_custom($key, $area_id));
       break;
 
   } // switch
